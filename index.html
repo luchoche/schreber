@@ -1,0 +1,1663 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Caso Schreber: Modelo del Aparato Psíquico y Línea de Tiempo Interactiva</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js and OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- Tween.js for smooth animations -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+    <style>
+        :root {
+            --bg-color: #080c14;
+            --panel-bg: rgba(15, 23, 42, 0.94);
+            --card-bg: rgba(30, 41, 59, 0.85);
+            --accent-gold: #f59e0b;
+            --accent-blue: #38bdf8;
+            --accent-red: #ef4444;
+            --accent-purple: #c084fc;
+            --accent-emerald: #10b981;
+            --text-light: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-light);
+            overflow-x: hidden;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 7px;
+            height: 7px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.9);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.35);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(148, 163, 184, 0.55);
+        }
+
+        /* --- 3D VIEWPORT (APARATO PSÍQUICO DE FREUD) --- */
+        #model-section {
+            position: relative;
+            width: 100%;
+            height: 370px;
+            min-height: 340px;
+            background: radial-gradient(ellipse at 50% 45%, #172554 0%, #080c14 85%);
+            overflow: hidden;
+        }
+
+        #canvas-3d-wrapper {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .viewport-tools {
+            position: absolute;
+            top: 14px;
+            right: 20px;
+            display: flex;
+            gap: 8px;
+            z-index: 10;
+        }
+
+        .btn-tool {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #cbd5e1;
+            padding: 5px 12px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .btn-tool:hover {
+            background: var(--accent-blue);
+            color: #0f172a;
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+        }
+
+        /* --- 2D TIMELINE: FIGURA LIMPIA SIN CAJA CONTENEDORA --- */
+        #timeline-2d-section {
+            background: transparent;
+            padding: 4px 20px 8px 20px;
+            position: relative;
+        }
+
+        .timeline-scroll-container {
+            position: relative;
+            width: 100%;
+            max-width: 1440px;
+            margin: 0 auto;
+            padding: 0;
+        }
+
+        /* Cards Track Area (Compact Height) */
+        .events-cards-track {
+            position: relative;
+            height: 84px;
+            width: 100%;
+            margin-bottom: 4px;
+        }
+
+        /* Individual Event Card Floating above timeline */
+        .event-anchor {
+            position: absolute;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            transition: opacity 0.25s ease, transform 0.25s ease, filter 0.25s ease;
+            width: 116px;
+            bottom: 0;
+            pointer-events: auto;
+        }
+
+        /* The Card Bubble */
+        .event-bubble {
+            background: rgba(15, 23, 42, 0.94);
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            border-radius: 8px;
+            padding: 4px 6px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.6);
+            transition: all 0.25s ease;
+            backdrop-filter: blur(8px);
+        }
+
+        .event-bubble-year {
+            font-size: 0.65rem;
+            font-weight: 800;
+            color: var(--accent-gold);
+            letter-spacing: 0.5px;
+            font-family: monospace;
+            line-height: 1;
+            margin-bottom: 2px;
+        }
+
+        .event-bubble-title {
+            font-size: 0.67rem;
+            font-weight: 700;
+            color: #f1f5f9;
+            line-height: 1.2;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            height: 22px;
+        }
+
+        .event-bubble-symptom {
+            margin-top: 2px;
+            font-size: 0.58rem;
+            font-weight: 600;
+            padding: 1px 3px;
+            border-radius: 3px;
+            background: rgba(239, 68, 68, 0.22);
+            color: #fca5a5;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: block;
+        }
+
+        /* Connecting vertical line down to the timeline bar */
+        .event-stem-line {
+            width: 2px;
+            background: linear-gradient(180deg, rgba(148, 163, 184, 0.5) 0%, rgba(56, 189, 248, 0.8) 100%);
+            transition: height 0.25s ease, background 0.25s ease, box-shadow 0.25s ease;
+        }
+
+        /* Stem dot resting right on the timeline bar */
+        .event-stem-dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: #64748b;
+            border: 2px solid #080c14;
+            transition: all 0.25s ease;
+            margin-top: -1px;
+        }
+
+        /* State: Distant / Hidden / Dimmed */
+        .event-anchor.dimmed {
+            opacity: 0.16;
+            transform: translateX(-50%) scale(0.82);
+            filter: blur(0.5px);
+        }
+        .event-anchor.dimmed .event-stem-line {
+            opacity: 0.25;
+        }
+
+        /* State: In-range (Approaching the slider button) */
+        .event-anchor.approaching {
+            opacity: 0.78;
+            transform: translateX(-50%) scale(0.96);
+            filter: none;
+        }
+        .event-anchor.approaching .event-bubble {
+            border-color: rgba(56, 189, 248, 0.7);
+            background: rgba(30, 41, 59, 0.96);
+        }
+        .event-anchor.approaching .event-stem-line {
+            background: linear-gradient(180deg, #38bdf8 0%, #38bdf8 100%);
+            box-shadow: 0 0 6px #38bdf8;
+        }
+        .event-anchor.approaching .event-stem-dot {
+            background: #38bdf8;
+            transform: scale(1.2);
+        }
+
+        /* State: Active (Directly under the button) */
+        .event-anchor.active {
+            opacity: 1 !important;
+            transform: translateX(-50%) scale(1.08) translateY(-4px) !important;
+            z-index: 25;
+            filter: none;
+        }
+        .event-anchor.active .event-bubble {
+            border-color: var(--accent-gold);
+            background: rgba(15, 23, 42, 0.98);
+            box-shadow: 0 0 20px rgba(245, 158, 11, 0.5), 0 4px 12px rgba(0,0,0,0.7);
+        }
+        .event-anchor.active .event-bubble-title {
+            color: #ffffff;
+            font-weight: 800;
+        }
+        .event-anchor.active .event-stem-line {
+            background: linear-gradient(180deg, var(--accent-gold) 0%, #38bdf8 100%);
+            width: 2.5px;
+            box-shadow: 0 0 8px var(--accent-gold);
+        }
+        .event-anchor.active .event-stem-dot {
+            background: var(--accent-gold);
+            border-color: #ffffff;
+            box-shadow: 0 0 12px var(--accent-gold);
+            transform: scale(1.5);
+        }
+
+        /* --- THE HORIZONTAL SLIDER BAR & DRAGGABLE THUMB --- */
+        .timeline-axis-wrap {
+            position: relative;
+            width: 100%;
+            height: 32px;
+            display: flex;
+            align-items: center;
+        }
+
+        /* Background rail */
+        .timeline-rail {
+            position: absolute;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: #1e293b;
+            border-radius: 3px;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.6);
+        }
+
+        .timeline-rail-progress {
+            position: absolute;
+            left: 0;
+            height: 5px;
+            background: linear-gradient(90deg, #38bdf8 0%, #a855f7 50%, #f59e0b 100%);
+            border-radius: 3px;
+            width: 0%;
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
+            transition: width 0.05s linear;
+        }
+
+        /* Native Slider Input positioned exactly over the rail */
+        .slider-native-input {
+            -webkit-appearance: none;
+            appearance: none;
+            position: absolute;
+            left: 0;
+            width: 100%;
+            height: 32px;
+            background: transparent;
+            outline: none;
+            cursor: pointer;
+            z-index: 30;
+            margin: 0;
+        }
+
+        .slider-native-input::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: #ffffff;
+            border: 3.5px solid var(--accent-gold);
+            box-shadow: 0 0 18px rgba(245, 158, 11, 0.9), 0 3px 8px rgba(0,0,0,0.7);
+            cursor: grab;
+            transition: transform 0.15s ease, border-color 0.15s ease;
+        }
+
+        .slider-native-input::-webkit-slider-thumb:hover {
+            transform: scale(1.18);
+            box-shadow: 0 0 24px rgba(245, 158, 11, 1);
+        }
+
+        .slider-native-input::-webkit-slider-thumb:active {
+            cursor: grabbing;
+            transform: scale(1.24);
+            border-color: #38bdf8;
+            box-shadow: 0 0 28px rgba(56, 189, 248, 1);
+        }
+
+        .slider-native-input::-moz-range-thumb {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: #ffffff;
+            border: 3.5px solid var(--accent-gold);
+            box-shadow: 0 0 18px rgba(245, 158, 11, 0.9);
+            cursor: grab;
+        }
+
+        /* Scrubber floating badge above thumb */
+        #scrubber-bubble {
+            position: absolute;
+            top: -30px;
+            transform: translateX(-50%);
+            background: var(--accent-gold);
+            color: #000000;
+            font-size: 0.72rem;
+            font-weight: 800;
+            padding: 2px 8px;
+            border-radius: 16px;
+            pointer-events: none;
+            white-space: nowrap;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.6);
+            z-index: 35;
+            transition: left 0.05s linear;
+        }
+        #scrubber-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 4px 4px 0 4px;
+            border-style: solid;
+            border-color: var(--accent-gold) transparent transparent transparent;
+        }
+
+        /* Divisiones de Etapas Sutiles Integradas */
+        .stage-pill {
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.72rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(30, 41, 59, 0.4);
+            color: #94a3b8;
+            text-align: center;
+            line-height: 1.2;
+        }
+        .stage-pill:hover {
+            border-color: rgba(245, 158, 11, 0.4);
+            background: rgba(30, 41, 59, 0.75);
+            color: #ffffff;
+        }
+        .stage-pill.active {
+            border-color: var(--accent-gold);
+            background: rgba(245, 158, 11, 0.12);
+            color: var(--accent-gold);
+            font-weight: 700;
+            box-shadow: 0 0 10px rgba(245, 158, 11, 0.2);
+        }
+
+        .btn-nav {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #e2e8f0;
+            padding: 7px 14px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .btn-nav:hover {
+            background: var(--accent-gold);
+            color: #0f172a;
+            border-color: var(--accent-gold);
+            box-shadow: 0 0 12px rgba(245, 158, 11, 0.4);
+        }
+
+        /* --- DETAILS SECTION (CARDS) --- */
+        /* --- PANEL DE CONTRASTE CLÍNICO: BROTE vs RESTITUCIÓN --- */
+        #clinical-contrast-bar {
+            margin: 6px 0 10px 0;
+            border-radius: 10px;
+            padding: 8px 14px;
+            transition: all 0.35s ease;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
+        .contrast-brote {
+            background: linear-gradient(90deg, rgba(239, 68, 68, 0.18) 0%, rgba(15, 23, 42, 0.9) 100%);
+            border-color: rgba(239, 68, 68, 0.45) !important;
+            box-shadow: 0 0 16px rgba(239, 68, 68, 0.15);
+        }
+
+        .contrast-restitucion {
+            background: linear-gradient(90deg, rgba(168, 85, 247, 0.2) 0%, rgba(15, 23, 42, 0.9) 100%);
+            border-color: rgba(168, 85, 247, 0.45) !important;
+            box-shadow: 0 0 16px rgba(168, 85, 247, 0.18);
+        }
+
+        .contrast-previa {
+            background: rgba(30, 41, 59, 0.7);
+            border-color: rgba(56, 189, 248, 0.3) !important;
+        }
+
+        /* --- DIBUJO DEL TEXTO DE FREUD (TOMO CLÁSICO 1911) --- */
+        #freud-book-section {
+            max-width: 1440px;
+            margin: 14px auto 35px auto;
+            padding: 0 20px;
+        }
+
+        .freud-tome-book {
+            background: linear-gradient(135deg, #0d1527 0%, #090e1a 100%);
+            border: 1.5px solid rgba(245, 158, 11, 0.35);
+            border-radius: 14px;
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+            display: grid;
+            grid-template-columns: 1.15fr 0.85fr;
+            backdrop-filter: blur(12px);
+        }
+
+        @media (max-width: 980px) {
+            .freud-tome-book {
+                grid-template-columns: 1fr;
+            }
+            #clinical-contrast-bar {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 6px;
+            }
+        }
+
+        /* Columna Izquierda: Página del Manuscrito con la Cita */
+        .book-page-left {
+            padding: 24px 28px;
+            border-right: 1px solid rgba(245, 158, 11, 0.2);
+            position: relative;
+            background: radial-gradient(circle at top left, rgba(245, 158, 11, 0.05) 0%, transparent 60%);
+        }
+
+        .book-header-banner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(245, 158, 11, 0.25);
+            padding-bottom: 8px;
+            margin-bottom: 14px;
+        }
+
+        .freud-quote-text {
+            font-family: 'Georgia', 'Times New Roman', serif;
+            font-size: 1.05rem;
+            line-height: 1.65;
+            color: #fef08a;
+            font-style: italic;
+            position: relative;
+            padding-left: 20px;
+            border-left: 3px solid var(--accent-gold);
+            margin: 12px 0;
+            transition: opacity 0.25s ease, transform 0.25s ease;
+        }
+
+        /* Columna Derecha: Articulación Metapsicológica y Medidores */
+        .book-page-right {
+            padding: 24px 26px;
+            background: rgba(15, 23, 42, 0.6);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .meter-bar-container {
+            margin-bottom: 9px;
+        }
+        .meter-bg {
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .meter-fill {
+            height: 100%;
+            transition: width 0.35s ease;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 1. APARATO PSÍQUICO DE FREUD (MODELO 3D EN LA PARTE SUPERIOR) -->
+    <header id="model-section">
+        <div id="canvas-3d-wrapper"></div>
+
+        <!-- 3D Controls -->
+        <div class="viewport-tools">
+            <button id="btn-reset-cam" class="btn-tool" title="Centrar cámara">
+                🔄 Centrar Vista 3D
+            </button>
+            <button id="btn-toggle-orbit" class="btn-tool" title="Rotación suave">
+                🌐 Rotación: ON
+            </button>
+        </div>
+    </header>
+
+    <!-- 2. LÍNEA DE TIEMPO 2D (DEBAJO DEL MODELO 3D) CON ACONTECIMIENTOS Y DIVISIONES -->
+    <section id="timeline-2d-section">
+        <div class="max-w-7xl mx-auto">
+            
+            <!-- Divisiones de las 6 Etapas -->
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mb-2">
+                <button class="stage-pill active" data-stage="1">
+                    <div class="text-[10px] text-amber-400 font-bold uppercase">1. Previa & 1ª Crisis</div>
+                    <div class="text-xs">1842 – 1885</div>
+                </button>
+                <button class="stage-pill" data-stage="2">
+                    <div class="text-[10px] text-sky-400 font-bold uppercase">2. Intervalo Sano</div>
+                    <div class="text-xs">1886 – 1893</div>
+                </button>
+                <button class="stage-pill" data-stage="3">
+                    <div class="text-[10px] text-rose-400 font-bold uppercase">3. Desencadenamiento</div>
+                    <div class="text-xs">Jun – Nov 1893</div>
+                </button>
+                <button class="stage-pill" data-stage="4">
+                    <div class="text-[10px] text-red-500 font-bold uppercase">4. Persecución & Catástrofe</div>
+                    <div class="text-xs">1893 – 1894</div>
+                </button>
+                <button class="stage-pill" data-stage="5">
+                    <div class="text-[10px] text-purple-400 font-bold uppercase">5. Mujer de Dios</div>
+                    <div class="text-xs">Noviembre 1895</div>
+                </button>
+                <button class="stage-pill" data-stage="6">
+                    <div class="text-[10px] text-emerald-400 font-bold uppercase">6. Estabilización & Libertad</div>
+                    <div class="text-xs">1896 – 1903</div>
+                </button>
+            </div>
+
+            <!-- Barra de Contraste Clínico: Brote vs Restitución -->
+            <div id="clinical-contrast-bar" class="contrast-previa">
+                <div class="flex items-center gap-2">
+                    <span id="contrast-badge" class="text-xs px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider bg-sky-500/20 text-sky-400 border border-sky-500/40">
+                        Fase Previa & Latente
+                    </span>
+                    <span id="contrast-phase-title" class="text-xs font-bold text-slate-200">
+                        Desarrollo e Intervalo Libre de Síntomas
+                    </span>
+                </div>
+                <div id="contrast-example-text" class="text-xs text-slate-300 italic max-w-2xl text-right">
+                    Sin fenómenos alucinatorios ni persecutorios activos.
+                </div>
+            </div>
+
+            <!-- Figura de la Línea de Tiempo con Acontecimientos Conectados -->
+            <div class="timeline-scroll-container">
+                <!-- Track de Tarjetas de Acontecimientos y Líneas Conectoras -->
+                <div id="events-cards-container" class="events-cards-track">
+                    <!-- Event anchors, cards and vertical lines injected here dynamically -->
+                </div>
+
+                <!-- Riel Horizontal con Botón Desplazable -->
+                <div class="timeline-axis-wrap">
+                    <div id="scrubber-bubble">1842</div>
+                    <div class="timeline-rail"></div>
+                    <div id="rail-progress" class="timeline-rail-progress"></div>
+                    
+                    <!-- Botón de desplazamiento horizontal nativo -->
+                    <input 
+                        type="range" 
+                        id="timeline-horizontal-slider" 
+                        class="slider-native-input" 
+                        min="0" 
+                        max="13" 
+                        step="0.01" 
+                        value="0"
+                        aria-label="Botón de desplazamiento horizontal"
+                    >
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 3. EL DIBUJO DEL TEXTO DE FREUD (1911): REFERENCIAS, CITAS Y ARTICULACIÓN -->
+    <section id="freud-book-section">
+        <div class="freud-tome-book">
+            <!-- Columna Izquierda: La Página del Manuscrito con la Cita Textual de Freud -->
+            <div class="book-page-left">
+                <div class="book-header-banner">
+                    <div class="flex items-center gap-2">
+                        <span class="text-lg">📖</span>
+                        <div>
+                            <div class="text-[11px] font-mono uppercase tracking-wider text-amber-400/90 font-bold">
+                                Sigmund Freud (1911) — Obras Completas (AE, Tomo XII)
+                            </div>
+                            <div class="text-xs text-slate-300 font-medium">
+                                Puntualizaciones psicoanalíticas sobre un caso de paranoia (Dementia paranoides)
+                            </div>
+                        </div>
+                    </div>
+                    <div id="freud-book-page-ref" class="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30">
+                        AE XII, p. 50
+                    </div>
+                </div>
+
+                <div class="mb-2">
+                    <div class="flex items-center justify-between text-xs mb-1">
+                        <span id="freud-section-label" class="text-purple-300 font-semibold uppercase tracking-wider text-[11px]">
+                            Sección III: Sobre el mecanismo de la paranoia
+                        </span>
+                        <span id="freud-event-sync-badge" class="text-[11px] text-slate-400 font-mono">
+                            Hito: 1842
+                        </span>
+                    </div>
+                    <h3 id="freud-chapter-topic" class="text-sm md:text-base font-bold text-white mb-2">
+                        La figura del padre y la génesis de las fijaciones narcisistas
+                    </h3>
+                </div>
+
+                <!-- Cita textual de Freud dinámica -->
+                <blockquote class="freud-quote-text" id="freud-quote-body">
+                    «El padre, ese médico eminente venerado por millares de personas, es el modelo originario de Dios en el delirio schreberiano...»
+                </blockquote>
+
+                <div class="mt-4 pt-3 border-t border-amber-500/15 flex items-center justify-between text-[11px] text-slate-400">
+                    <span>🖋️ Texto canónico de Freud sobre el historial de Schreber</span>
+                    <span class="text-amber-400 font-mono">● Referencia sincronizada al desplazamiento horizontal</span>
+                </div>
+            </div>
+
+            <!-- Columna Derecha: Articulación Metapsicológica y Variables del Aparato Psíquico -->
+            <div class="book-page-right">
+                <div>
+                    <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-400 mb-2 border-b border-slate-700/60 pb-1.5">
+                        <span>🧠</span>
+                        <span>Articulación Teórica en este punto:</span>
+                    </div>
+                    <p id="freud-analytic-commentary" class="text-xs text-slate-200 leading-relaxed mb-4">
+                        Freud demuestra que el sistema delirante no surge de la nada, sino de la reactivación de la relación primordial infantil con el padre severo y admirado.
+                    </p>
+                </div>
+
+                <!-- Variables del Aparato Psíquico Integradas -->
+                <div class="bg-slate-900/90 p-3 rounded-lg border border-purple-900/40 text-xs">
+                    <span class="font-bold uppercase tracking-wider text-purple-300 block mb-2 text-[11px]">
+                        Estado Pulsional en el Aparato Psíquico:
+                    </span>
+
+                    <div class="meter-bar-container">
+                        <div class="flex justify-between text-slate-300 mb-1 text-[11px]">
+                            <span>Fijación al Narcisismo (Yo)</span>
+                            <span id="num-narc" class="font-mono text-sky-400 font-bold">20%</span>
+                        </div>
+                        <div class="meter-bg">
+                            <div id="bar-narc" class="meter-fill bg-sky-400" style="width: 20%;"></div>
+                        </div>
+                    </div>
+
+                    <div class="meter-bar-container">
+                        <div class="flex justify-between text-slate-300 mb-1 text-[11px]">
+                            <span>Moción Homosexual Pasiva</span>
+                            <span id="num-lib" class="font-mono text-amber-400 font-bold">10%</span>
+                        </div>
+                        <div class="meter-bg">
+                            <div id="bar-lib" class="meter-fill bg-amber-400" style="width: 10%;"></div>
+                        </div>
+                    </div>
+
+                    <div class="meter-bar-container">
+                        <div class="flex justify-between text-slate-300 mb-1 text-[11px]">
+                            <span>Retiro de Libido / Represión</span>
+                            <span id="num-rep" class="font-mono text-rose-500 font-bold">0%</span>
+                        </div>
+                        <div class="meter-bg">
+                            <div id="bar-rep" class="meter-fill bg-rose-500" style="width: 0%;"></div>
+                        </div>
+                    </div>
+
+                    <div class="meter-bar-container">
+                        <div class="flex justify-between text-slate-300 mb-1 text-[11px]">
+                            <span>Restitución Delirante / Megalomanía</span>
+                            <span id="num-rest" class="font-mono text-purple-400 font-bold">0%</span>
+                        </div>
+                        <div class="meter-bg">
+                            <div id="bar-rest" class="meter-fill bg-purple-400" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SCRIPTS -->
+    <script>
+        // --- 14 ACONTECIMIENTOS: BROTE vs RESTITUCIÓN & CITAS DEL TEXTO DE FREUD (1911) ---
+        const schreberEvents = [
+            // ETAPA 1: 1842 - 1885
+            {
+                id: 0,
+                stage: 1,
+                stageName: "Etapa previa y primera enfermedad (1842–1885)",
+                yearLabel: "1842",
+                title: "Nacimiento y trayectoria de D. P. Schreber",
+                cardTitle: "Nacimiento y familia",
+                clinicalType: "previa",
+                contrastBadge: "Fase Previa & Latente",
+                contrastHeadline: "Desarrollo e Intervalo Libre de Síntomas",
+                contrastExample: "Juventud y formación sin síntomas psiquiátricos manifiestos. Constitución de puntos de fijación pre-edípicos y disciplina paterna ortopédica.",
+                symptomChips: ["Eficacia jurídica", "Juicio lúcido", "Fijación latente"],
+                freudRef: {
+                    page: "AE XII, págs. 50-51",
+                    section: "Sección III: Sobre el mecanismo de la paranoia",
+                    topic: "La figura del padre y la génesis de las fijaciones narcisistas",
+                    quote: "El padre, ese médico eminente venerado por millares de personas, es el modelo originario de Dios en el delirio schreberiano. La relación con el padre y el hermano mayor constituye el suelo nutricio de donde brotan más tarde tanto las fantasías de sumisión como los puntos de fijación narcisistas.",
+                    commentary: "Freud demuestra que la construcción teológica no surge del vacío, sino que reanima la relación primordial infantil con el padre admirado y temido (Moritz Schreber), cuyo régimen pedagógico estricto marcó el cuerpo del niño."
+                },
+                metrics: { narc: 20, lib: 10, rep: 0, rest: 0 },
+                modelStatus: "Investidura Normal de Objeto (Equilibrio Inicial)"
+            },
+            {
+                id: 1,
+                stage: 1,
+                stageName: "Etapa previa y primera enfermedad (1842–1885)",
+                yearLabel: "1878",
+                title: "Matrimonio con Sabina y frustración",
+                cardTitle: "Matrimonio y frustración filial",
+                clinicalType: "previa",
+                contrastBadge: "Fase Previa & Latente",
+                contrastHeadline: "Matrimonio y Frustración de la Paternidad",
+                contrastExample: "Matrimonio dichoso pero ensombrecido por la falta de descendencia; repetidos abortos espontáneos que dejan un cauce insatisfecho de libido.",
+                symptomChips: ["Frustración paternal", "Duelo sublimado", "Herida narcisista"],
+                freudRef: {
+                    page: "AE XII, pág. 54",
+                    section: "Sección II: Intentos de interpretación",
+                    topic: "La falta de hijos como factor etiológico mudo",
+                    quote: "Su matrimonio permaneció sin hijos. Si Daniel Paul Schreber hubiera sido padre, la investidura libidinal habría hallado un destino natural en la descendencia. La falta de hijos dejó un estanque de libido sin ligadura objetal, acumulando una sobrecarga en el aparato anímico.",
+                    commentary: "La insatisfacción de la investidura objetal filial generacional crea una fragilidad interna: la libido estancada queda predispuesta a fluir por senderos regresivos ante frustraciones sociales venideras."
+                },
+                metrics: { narc: 30, lib: 30, rep: 5, rest: 0 },
+                modelStatus: "Tensión Libidinal hacia el Objeto"
+            },
+            {
+                id: 2,
+                stage: 1,
+                stageName: "Etapa previa y primera enfermedad (1842–1885)",
+                yearLabel: "Otoño 1884",
+                title: "Primera crisis psiquiátrica: Reichstag",
+                cardTitle: "1ª Crisis: Hipocondría grave",
+                clinicalType: "brote",
+                contrastBadge: "1ª Crisis: Hipocondría Grave",
+                contrastHeadline: "Cansancio Nervioso y Agotamiento Fálico",
+                contrastExample: "A los 42 años, tras su candidatura al Reichstag: cansancio cerebral insoportable, rápida consunción corporal, pérdida drástica de peso e hipocondría.",
+                symptomChips: ["Hipocondría grave", "Cansancio nervioso", "Pérdida de peso", "Angustia"],
+                freudRef: {
+                    page: "AE XII, págs. 19-20",
+                    section: "Sección I: Historial clínico",
+                    topic: "La hipocondría grave por sobreesfuerzo mental",
+                    quote: "La primera enfermedad sobrevino a raíz de un esfuerzo mental extraordinario: la candidatura al Reichstag. Se manifestó como una hipocondría grave, con agotamiento cerebral, adelgazamiento y angustia, sin que aflorara todavía el delirio persecutorio sistematizado.",
+                    commentary: "Freud clasifica este primer cuadro como una neurosis narcisista transitoria: el agotamiento social fuerza a la libido a retirarse del mundo exterior y congestionar los órganos somáticos bajo angustia hipocondríaca."
+                },
+                metrics: { narc: 48, lib: 40, rep: 25, rest: 0 },
+                modelStatus: "Retracción parcial de la libido al Yo (Hipocondría)"
+            },
+            {
+                id: 3,
+                stage: 1,
+                stageName: "Etapa previa y primera enfermedad (1842–1885)",
+                yearLabel: "1884–1885",
+                title: "Primer internamiento con Flechsig",
+                cardTitle: "Internación con Flechsig",
+                clinicalType: "previa",
+                contrastBadge: "Transferencia Médica",
+                contrastHeadline: "Lazo Afectivo Transferencial hacia el Dr. Flechsig",
+                contrastExample: "Internamiento en Leipzig con Flechsig; recuperación a fines de 1885 con gratitud devota y veneración hacia el médico que le salvó la razón.",
+                symptomChips: ["Transferencia médica", "Gratitud devota", "Calma sintomática"],
+                freudRef: {
+                    page: "AE XII, págs. 43-44",
+                    section: "Sección II: Intentos de interpretación",
+                    topic: "La investidura transferencial homosexual en el médico",
+                    quote: "Schreber guardó hacia Flechsig una gratitud inextinguible, un apego afectivo rayano en la veneración. Esta intensa investidura transferencial no era otra cosa que una moción homosexual pasiva sublimada, depositada en el médico como sustituto de la figura paterna protectora.",
+                    commentary: "La curación transitoria descansó en el lazo transferencial tierno hacia Flechsig. Mientras el médico ocupó el lugar de padre benévolo, la moción pasiva se mantuvo en un equilibrio defensivo compensado."
+                },
+                metrics: { narc: 35, lib: 55, rep: 10, rest: 5 },
+                modelStatus: "Intensa Investidura Transferencial hacia Flechsig"
+            },
+
+            // ETAPA 2: 1886 - 1893
+            {
+                id: 4,
+                stage: 2,
+                stageName: "Periodo de intervalo saludable (1886–1893)",
+                yearLabel: "1886–1893",
+                title: "Reintegración laboral e intervalo saludable",
+                cardTitle: "Intervalo saludable (8 años)",
+                clinicalType: "previa",
+                contrastBadge: "Intervalo Saludable (8 Años)",
+                contrastHeadline: "Compensación por la Sublimación y el Trabajo Judicial",
+                contrastExample: "Ocho años como Presidente del Tribunal Provincial de Leipzig con lucidez impecable, respeto social y completa ausencia de trastornos mentales.",
+                symptomChips: ["Sin alteraciones mentales", "Alto rendimiento", "Lucidez jurídica"],
+                freudRef: {
+                    page: "AE XII, págs. 20-21",
+                    section: "Sección I: Historial clínico",
+                    topic: "El intervalo asintomático y la defensa sostenida",
+                    quote: "Durante ocho años Schreber desempeñó su alto cargo de presidente de tribunal con probada sagacidad y sin rastro de desvarío. La libido se mantuvo ligada al trabajo judicial y al matrimonio, sofocando con éxito la moción patógena inconsciente.",
+                    commentary: "El período prueba que la fijación puede permanecer latente y silenciosa durante años si la sublimación en las funciones intelectuales y el lazo civil mantienen drenada la energía pulsional."
+                },
+                metrics: { narc: 25, lib: 35, rep: 8, rest: 0 },
+                modelStatus: "Equilibrio Estable y Fluido de Libido"
+            },
+
+            // ETAPA 3: Junio - Noviembre 1893
+            {
+                id: 5,
+                stage: 3,
+                stageName: "Desencadenamiento del segundo brote (Junio – Noviembre 1893)",
+                yearLabel: "Junio 1893",
+                title: "Designación judicial y fantasía de ser mujer",
+                cardTitle: "Fantasía de ser mujer",
+                clinicalType: "brote",
+                contrastBadge: "Desencadenamiento del Brote",
+                contrastHeadline: "La Fantasía en Duermevela de Ser Mujer",
+                contrastExample: "En duermevela surge involuntariamente: 'qué hermoso sería ser una mujer sometida al acoplamiento'; la rechaza de inmediato con enérgica indignación viril.",
+                symptomChips: ["Fantasía de ser mujer", "Indignación viril", "Angustia súbita"],
+                freudRef: {
+                    page: "AE XII, págs. 41-42",
+                    section: "Sección II: Intentos de interpretación",
+                    topic: "El desencadenamiento: irrupción de la moción homosexual pasiva",
+                    quote: "Una mañana, en duermevela, le asaltó la idea de 'lo hermoso que sería ser una mujer sometida al acoplamiento'. Esta ocurrencia involuntaria marca el momento exacto del desencadenamiento: la moción homosexual pasiva penetra la conciencia y el Yo se indigna con viril repugnancia.",
+                    commentary: "El nombramiento como Presidente de Sala en Dresde reactivó la exigencia ante la figura paterna. La fantasía de emasculación pasiva es sentida por el Yo como un ataque inadmisible, desatando la defensa patológica."
+                },
+                metrics: { narc: 55, lib: 80, rep: 45, rest: 0 },
+                modelStatus: "Conflicto Agudo contra la Barrera de Represión"
+            },
+            {
+                id: 6,
+                stage: 3,
+                stageName: "Desencadenamiento del segundo brote (Junio – Noviembre 1893)",
+                yearLabel: "1º Oct 1893",
+                title: "Asunción, insomnio, crujidos e intento suicida",
+                cardTitle: "Colapso, crujidos y suicidio",
+                clinicalType: "brote",
+                contrastBadge: "Fase de Brote: Colapso y Alucinaciones",
+                contrastHeadline: "Insomnio Martirizador, Crujidos e Intentos Suicidas",
+                contrastExample: "Sobrecarga extrema en Dresde; insomnio invencible a somníferos, 'crujidos' incesantes en las paredes con intención de martirizarlo y desesperación suicida en la bañera.",
+                symptomChips: ["Insomnio martirizador", "Crujidos en la pared", "Intentos de suicidio", "Angustia"],
+                freudRef: {
+                    page: "AE XII, págs. 21, 42-43",
+                    section: "Sección I y II: Historial e Interpretación",
+                    topic: "El fracaso de la represión y la eclosión de la angustia",
+                    quote: "La sobrecarga mental y el choque de adaptación con colegas detonaron la catástrofe. El insomnio rebelde y los ruidos en la pared denotan el desborde pulsional que el Yo ya no puede tramitar, empujando al enfermo a la desesperación y al intento de suicidio en la bañera.",
+                    commentary: "La represión habitual fracasa. Al no existir todavía un delirio que dé ligadura a la pulsión, la energía no tramitada invade el Yo como terror pánico y fenómenos elementales acústicos."
+                },
+                metrics: { narc: 72, lib: 90, rep: 70, rest: 5 },
+                modelStatus: "Fractura de la Barrera y Angustia Pánica"
+            },
+
+            // ETAPA 4: Noviembre 1893 - 1894
+            {
+                id: 7,
+                stage: 4,
+                stageName: "Fase de aguda persecución, hipocondría y catástrofe (1893–1894)",
+                yearLabel: "Nov 1893",
+                title: "Reinternamiento en Leipzig y voces alucinadas",
+                cardTitle: "Estupor, poluciones y voces",
+                clinicalType: "brote",
+                contrastBadge: "Fase de Brote: Invasión Somática y Alucinatoria",
+                contrastHeadline: "Estupor, Poluciones Masivas y Retorno Alucinado",
+                contrastExample: "Tras 4 días de viaje de su esposa: inmovilidad en estupor mudo, poluciones nocturnas masivas involuntarias y voces alucinadas incesantes que lo torturan día y noche.",
+                symptomChips: ["Estupor alucinatorio", "Poluciones masivas", "Voces alucinadas", "Inmovilidad"],
+                freudRef: {
+                    page: "AE XII, págs. 42-43",
+                    section: "Sección II: Intentos de interpretación",
+                    topic: "El retorno de lo reprimido desde afuera como voces",
+                    quote: "El viaje de su mujer precipitó el desenlace. Desprovisto de ese ancla en la realidad, Schreber cae en estupor y padece poluciones seminales masivas. Al mismo tiempo, el reproche reprimido retorna desde el exterior bajo la forma de voces alucinadas que no le conceden reposo.",
+                    commentary: "Freud ilustra el retorno de lo reprimido: la pulsión rechazada emerge en el cuerpo como eyaculaciones involuntarias y en la percepción como voces exteriores que formulan los reproches de la censura."
+                },
+                metrics: { narc: 85, lib: 95, rep: 90, rest: 10 },
+                modelStatus: "Retracción Masiva de Libido hacia el Cuerpo"
+            },
+            {
+                id: 8,
+                stage: 4,
+                stageName: "Fase de aguda persecución, hipocondría y catástrofe (1893–1894)",
+                yearLabel: "Primavera 1894",
+                title: "Destrucción corporal y «Sepultamiento del mundo»",
+                cardTitle: "Destrucción visceral & Fin del Mundo",
+                clinicalType: "brote",
+                contrastBadge: "Fase de Brote: Catástrofe e Hipocondría Extrema",
+                contrastHeadline: "Destrucción de Órganos, Cadáver Leproso y Sepultamiento del Mundo",
+                contrastExample: "Certeza de vivir sin estómago (o con un 'estómago de judío'), sin pulmones, médula espinal bombeada por los pies, 'gusano pulmonar', cráneo comprimido por 'máquina de apretar la cabeza' manejada por diablillos con torniquete, y la humanidad aniquilada ('hombres hechos a la ligera').",
+                symptomChips: ["Estómago de judío", "Gusano pulmonar", "Cadáver leproso", "Fin del mundo", "Hombres a la ligera"],
+                freudRef: {
+                    page: "AE XII, págs. 64-66",
+                    section: "Sección III: Sobre el mecanismo de la paranoia",
+                    topic: "El 'fin del mundo' como desasimiento masivo de la libido",
+                    quote: "El 'sepultamiento del mundo' no es una mera metáfora: es la proyección al exterior del desasimiento radical de la libido respecto de personas y cosas. Y esa inmensa energía retirada no se destruye: refluye sobre el propio Yo, produciendo el colosal delirio hipocondríaco de destrucción de órganos.",
+                    commentary: "El 'fin del mundo' es la consecuencia psíquica del retiro de catexis del mundo exterior. Al inundarse el Yo con la libido arrancada, el cuerpo propio experimenta la vivencia de pudrición, órganos desgarrados y cadáver leproso."
+                },
+                metrics: { narc: 100, lib: 10, rep: 100, rest: 15 },
+                modelStatus: "Catástrofe Libidinal: Objeto Aniquilado, Yo Hiperinvestido"
+            },
+            {
+                id: 9,
+                stage: 4,
+                stageName: "Fase de aguda persecución, hipocondría y catástrofe (1893–1894)",
+                yearLabel: "Junio 1894",
+                title: "Almicidio, Flechsig y traslados (Coswig y Sonnenstein)",
+                cardTitle: "Almicidio y celda en Sonnenstein",
+                clinicalType: "brote",
+                contrastBadge: "Fase de Brote: Delirio Persecutorio Feroz",
+                contrastHeadline: "El 'Almicidio', Flechsig Perseguidor y Torturas por Milagros",
+                contrastExample: "Acusa a Flechsig de 'almicidio' (robo del alma) y complot para entregarlo al abuso sexual; confinado en celda de dementes de Sonnenstein, torturado por 'milagros' y voces injuriosas en el retrete: '¿Por qué no c... usted?' forzándolo a responder 'Quizá porque soy idiota'.",
+                symptomChips: ["Almicidio (robo de alma)", "Flechsig perseguidor", "Tortura por milagros", "Celda de dementes"],
+                freudRef: {
+                    page: "AE XII, págs. 43, 59-60",
+                    section: "Sección III: Sobre el mecanismo de la paranoia",
+                    topic: "La proyección: 'Yo no lo amo; lo odio, porque él me persigue'",
+                    quote: "El perseguidor es la persona antaño amada. La moción homosexual hacia Flechsig es negada y proyectada al exterior: 'Yo no lo amo; lo odio, porque él me persigue, me roba el alma (almicidio) y conspira para entregarme al ultraje sexual'. El delirio persecutorio es el escudo que protege al Yo de su propia pulsión.",
+                    commentary: "La contradicción paranoica clásica: la proposición inconsciente de amor homosexual se transforma mediante la proyección en persecución hostil del médico; Dios y Flechsig se vuelven torturadores implacables."
+                },
+                metrics: { narc: 95, lib: 35, rep: 90, rest: 35 },
+                modelStatus: "Proyección Persecutoria Activa contra el Objeto"
+            },
+
+            // ETAPA 5: Noviembre 1895
+            {
+                id: 10,
+                stage: 5,
+                stageName: "El punto de viraje y la aceptación de la feminización (Noviembre 1895)",
+                yearLabel: "Nov 1895",
+                title: "El punto de viraje: «La Mujer de Dios»",
+                cardTitle: "Mujer de Dios (Gran Viraje)",
+                clinicalType: "restitucion",
+                contrastBadge: "Fase de Restitución: El Gran Viraje",
+                contrastHeadline: "Aceptación de la Emasculación y la 'Mujer de Dios'",
+                contrastExample: "Percibe intensos signos de feminización y decide no resistirse más: la emasculación deja de ser humillación para prostituirlo y se convierte en deber religioso sagrado y misión cósmica para ser la consorte fecundada por los rayos divinos (Ormuz y Arimán) y dar a luz a una nueva humanidad.",
+                symptomChips: ["Voluptuosidad del alma", "Esposa de Dios", "Fecundación divina", "Cesación del terror"],
+                freudRef: {
+                    page: "AE XII, págs. 46-48, 66-68",
+                    section: "Sección II y III: Interpretación y Mecanismo",
+                    topic: "El delirio como tentativa de curación y restitución cósmica",
+                    quote: "El punto culminante: la emasculación deja de ser una humillación criminal y pasa a ser un deber hacia Dios. Aquí formulamos nuestra tesis fundamental: la formación delirante que consideramos el producto patológico es, en verdad, el intento de curación, la reconstrucción del mundo destruido.",
+                    commentary: "Tesis revolucionaria de Freud: el delirio no es la enfermedad, sino el esfuerzo reconstructivo del aparato psíquico por restablecer la ligadura con el mundo y pacificar el conflicto irreconciliable de la emasculación."
+                },
+                metrics: { narc: 85, lib: 60, rep: 45, rest: 85 },
+                modelStatus: "Restitución Mística: Rayos Divinos descendiendo al Yo"
+            },
+
+            // ETAPA 6: 1896 - 1903
+            {
+                id: 11,
+                stage: 6,
+                stageName: "Estabilización, redacción y proceso de liberación (1896–1903)",
+                yearLabel: "1896–1900",
+                title: "Rutina pacificada y atenuación de síntomas",
+                cardTitle: "Rutina pacificada y piano",
+                clinicalType: "restitucion",
+                contrastBadge: "Fase de Restitución: Pacificación Cotidiana",
+                contrastHeadline: "Voluptuosidad del Alma, Espejo, Piano y Pájaros Parlantes",
+                contrastExample: "Cultiva la feminidad ante el espejo con aderezos en soledad sintiendo la 'voluptuosidad del alma' que pacifica los rayos divinos. Neutraliza el acoso de las voces tocando al piano a Beethoven, jugando al ajedrez, leyendo la prensa y recitando poemas.",
+                symptomChips: ["Pájaros parlantes", "Compulsión a pensar (Denkzwang)", "Espejo y adornos", "Conducta lúcida"],
+                freudRef: {
+                    page: "AE XII, págs. 25-27, 72-73",
+                    section: "Sección I y III: Historial y Mecanismo",
+                    topic: "La convivencia pacificada y la escisión adaptativa del Yo",
+                    quote: "Schreber come en la mesa de los médicos, juega al ajedrez, lee la prensa y apacigua el murmullo de las voces tocando al piano a Beethoven. En la intimidad cultiva la feminidad ante el espejo con aderezos. El aparato psíquico logra una escisión funcional armónica.",
+                    commentary: "En la parafrenia estabilizada, una porción del Yo razona con plena lucidez civil y modales impecables, mientras otra sostiene el sistema teológico delirante sin angustia ni confusión confabulatoria."
+                },
+                metrics: { narc: 75, lib: 55, rep: 35, rest: 90 },
+                modelStatus: "Escisión Psíquica Pacificada y Equilibrio Delirante"
+            },
+            {
+                id: 12,
+                stage: 6,
+                stageName: "Estabilización, redacción y proceso de liberación (1896–1903)",
+                yearLabel: "1900",
+                title: "Redacción de Memorias e Incapacitación civil",
+                cardTitle: "Redacción de Memorias",
+                clinicalType: "restitucion",
+                contrastBadge: "Fase de Restitución: Sistematización Escrita",
+                contrastHeadline: "Redacción de las Memorias y Defensa Jurídica de su Razón",
+                contrastExample: "Escribe metódicamente sus 'Memorias de un enfermo de nervios' (feb-sep 1900) para fundamentar su teología y su plena salud mental; impugna la incapacidad civil dictada por el informe del Dr. Weber con alegatos de brillantez jurídica.",
+                symptomChips: ["Redacción de las Memorias", "Incapacidad legal", "Defensa jurídica", "Estructura teológica fija"],
+                freudRef: {
+                    page: "AE XII, págs. 22-24",
+                    section: "Sección I: Historial clínico",
+                    topic: "La obra escrita como ligadura simbólica de la pulsión",
+                    quote: "Escribe sus Memorias con el propósito deliberado de fundamentar su cordura jurídica y legar una doctrina científica a la posteridad. La redacción de la obra escrita opera como un dique ordenador supremo: el texto otorga a la restitución delirante el formato de una verdad transmisible.",
+                    commentary: "El lenguaje escrito opera como ligadura simbólica fundamental: el texto da cohesión definitiva a la energía restitutiva y busca el reconocimiento y convalidación del lazo social."
+                },
+                metrics: { narc: 70, lib: 65, rep: 30, rest: 95 },
+                modelStatus: "Cristalización Simbólica del Sistema Psicótico"
+            },
+            {
+                id: 13,
+                stage: 6,
+                stageName: "Estabilización, redacción y proceso de liberación (1896–1903)",
+                yearLabel: "1902–1903",
+                title: "Triunfo judicial, publicación de Memorias y libertad",
+                cardTitle: "Triunfo judicial y Libertad",
+                clinicalType: "restitucion",
+                contrastBadge: "Fase de Restitución: Triunfo y Libertad",
+                contrastHeadline: "Revocación Judicial de la Incapacitación y Alta Definitiva",
+                contrastExample: "El 14 de julio de 1902 el Tribunal Supremo de Dresde revoca la incapacidad al constatar su lucidez de juicio, capacidad jurídica y razonamiento civil; en 1903 publica sus Memorias y obtiene el alta médica definitiva.",
+                symptomChips: ["Revocación judicial", "Publicación de Memorias", "Alta médica y libertad"],
+                freudRef: {
+                    page: "AE XII, págs. 74-76",
+                    section: "Sección III: Conclusiones metapsicológicas",
+                    topic: "El triunfo de la restitución en la realidad civil y social",
+                    quote: "El 14 de julio de 1902 el tribunal superior declara libre a Schreber al comprobar que sus ideas sobre Dios y la feminización no comprometen en absoluto su capacidad de juicio ni su convivencia social. El delirio restitutivo le permitió reconquistar su dignidad de ciudadano.",
+                    commentary: "Freud concluye que el pacto restitutivo salvó a Schreber del colapso confusional y le permitió volver a habitar el mundo exterior civilizado, convirtiendo su autobiografía en el texto fundante del psicoanálisis de la paranoia."
+                },
+                metrics: { narc: 60, lib: 75, rep: 20, rest: 100 },
+                modelStatus: "Estabilidad Permanente: El Delirio como Síntesis Cosmológica"
+            }
+        ];
+
+        // --- GLOBAL APP STATE ---
+        let currentSliderVal = 0;
+        let selectedEventIndex = 0;
+        let isPlaying = false;
+        let playTimer = null;
+        let autoRotate3D = true;
+
+        // Three.js variables
+        let scene, camera, renderer, controls;
+        let egoGroup, egoMesh, egoWireframe;
+        let objectGroup, objectMesh, objectRing;
+        let repressionBarrier;
+        let libidoPoints, divineRaysPoints;
+        let dirLightYo, dirLightObj;
+
+        // DOM Elements
+        const eventsContainer = document.getElementById('events-cards-container');
+        const sliderInput = document.getElementById('timeline-horizontal-slider');
+        const scrubberBubble = document.getElementById('scrubber-bubble');
+        const railProgress = document.getElementById('rail-progress');
+        const btnResetCam = document.getElementById('btn-reset-cam');
+        const btnToggleOrbit = document.getElementById('btn-toggle-orbit');
+
+        // --- 1. INITIALIZE THREE.JS APPARATUS MODEL ---
+        function initThreeJS() {
+            const container = document.getElementById('canvas-3d-wrapper');
+            const rect = container.getBoundingClientRect();
+            const width = rect.width || window.innerWidth;
+            const height = rect.height || 400;
+
+            // Scene
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x080c14, 0.012);
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 1000);
+            camera.position.set(0, 3, 26);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(width, height);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            container.appendChild(renderer.domElement);
+
+            // Orbit Controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxDistance = 50;
+            controls.minDistance = 8;
+            controls.maxPolarAngle = Math.PI / 2 + 0.1;
+
+            // Lighting: Vibrant and multi-directional to guarantee visibility
+            const ambient = new THREE.AmbientLight(0xffffff, 0.85);
+            scene.add(ambient);
+
+            dirLightYo = new THREE.DirectionalLight(0x38bdf8, 1.4);
+            dirLightYo.position.set(-15, 12, 10);
+            scene.add(dirLightYo);
+
+            dirLightObj = new THREE.DirectionalLight(0xf59e0b, 1.4);
+            dirLightObj.position.set(15, 12, 10);
+            scene.add(dirLightObj);
+
+            const centerLight = new THREE.PointLight(0xffffff, 1.2, 40);
+            centerLight.position.set(0, 0, 6);
+            scene.add(centerLight);
+
+            // Build Apparatus Models
+            buildApparatus();
+
+            // Handle Resize
+            window.addEventListener('resize', onWindowResize);
+
+            // Animation Loop
+            animate();
+        }
+
+        function buildApparatus() {
+            // --- 1. YO / NARCISISMO (Izquierda) ---
+            egoGroup = new THREE.Group();
+            egoGroup.position.set(-7.5, 0, 0);
+            scene.add(egoGroup);
+
+            // Sólido interior
+            const egoGeom = new THREE.SphereGeometry(3.0, 32, 32);
+            const egoMat = new THREE.MeshStandardMaterial({
+                color: 0x38bdf8,
+                roughness: 0.25,
+                metalness: 0.3,
+                emissive: 0x0284c7,
+                emissiveIntensity: 0.4
+            });
+            egoMesh = new THREE.Mesh(egoGeom, egoMat);
+            egoGroup.add(egoMesh);
+
+            // Wireframe exterior
+            const egoWireGeom = new THREE.SphereGeometry(3.3, 20, 20);
+            const egoWireMat = new THREE.MeshBasicMaterial({
+                color: 0x7dd3fc,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.55
+            });
+            egoWireframe = new THREE.Mesh(egoWireGeom, egoWireMat);
+            egoGroup.add(egoWireframe);
+
+            // --- 2. OBJETO EXTERNO / MUNDO / FLECHSIG (Derecha) ---
+            objectGroup = new THREE.Group();
+            objectGroup.position.set(7.5, 0, 0);
+            scene.add(objectGroup);
+
+            // Sólido Objeto
+            const objGeom = new THREE.SphereGeometry(2.9, 32, 32);
+            const objMat = new THREE.MeshStandardMaterial({
+                color: 0xf59e0b,
+                roughness: 0.25,
+                metalness: 0.3,
+                emissive: 0xb45309,
+                emissiveIntensity: 0.4,
+                transparent: true,
+                opacity: 0.95
+            });
+            objectMesh = new THREE.Mesh(objGeom, objMat);
+            objectGroup.add(objectMesh);
+
+            // Anillo orbital planetario
+            const ringGeom = new THREE.TorusGeometry(4.2, 0.08, 16, 64);
+            const ringMat = new THREE.MeshBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.6 });
+            objectRing = new THREE.Mesh(ringGeom, ringMat);
+            objectRing.rotation.x = Math.PI / 3;
+            objectGroup.add(objectRing);
+
+            // --- 3. BARRERA DE LA REPRESIÓN (Centro) ---
+            const barGeom = new THREE.BoxGeometry(0.5, 9.5, 7.5);
+            const barMat = new THREE.MeshStandardMaterial({
+                color: 0xef4444,
+                transparent: true,
+                opacity: 0.25,
+                roughness: 0.1,
+                metalness: 0.6,
+                emissive: 0xb91c1c,
+                emissiveIntensity: 0.25
+            });
+            repressionBarrier = new THREE.Mesh(barGeom, barMat);
+            repressionBarrier.position.set(0, 0, 0);
+            scene.add(repressionBarrier);
+
+            // --- 4. CORRIENTE DE LIBIDO (Partículas) ---
+            const count = 300;
+            const pPositions = new Float32Array(count * 3);
+            const pSpeeds = [];
+
+            for (let i = 0; i < count; i++) {
+                pPositions[i * 3] = -7.5 + Math.random() * 15;
+                pPositions[i * 3 + 1] = (Math.random() - 0.5) * 4;
+                pPositions[i * 3 + 2] = (Math.random() - 0.5) * 4;
+
+                pSpeeds.push({
+                    vx: 0.06 + Math.random() * 0.06,
+                    vy: (Math.random() - 0.5) * 0.02,
+                    vz: (Math.random() - 0.5) * 0.02
+                });
+            }
+
+            const pGeom = new THREE.BufferGeometry();
+            pGeom.setAttribute('position', new THREE.BufferAttribute(pPositions, 3));
+            const pMat = new THREE.PointsMaterial({
+                color: 0x10b981,
+                size: 0.45,
+                transparent: true,
+                opacity: 0.85,
+                blending: THREE.AdditiveBlending
+            });
+
+            libidoPoints = new THREE.Points(pGeom, pMat);
+            libidoPoints.userData = { speeds: pSpeeds };
+            scene.add(libidoPoints);
+
+            // --- 5. RAYOS DIVINOS (Fase teológica / Mujer de Dios) ---
+            const rayCount = 180;
+            const rayPos = new Float32Array(rayCount * 3);
+            for (let i = 0; i < rayCount * 3; i += 3) {
+                rayPos[i] = -7.5 + (Math.random() - 0.5) * 6;
+                rayPos[i + 1] = 6 + Math.random() * 8;
+                rayPos[i + 2] = (Math.random() - 0.5) * 6;
+            }
+            const rayGeom = new THREE.BufferGeometry();
+            rayGeom.setAttribute('position', new THREE.BufferAttribute(rayPos, 3));
+            const rayMat = new THREE.PointsMaterial({
+                color: 0xc084fc,
+                size: 0.6,
+                transparent: true,
+                opacity: 0.0,
+                blending: THREE.AdditiveBlending
+            });
+            divineRaysPoints = new THREE.Points(rayGeom, rayMat);
+            scene.add(divineRaysPoints);
+        }
+
+        // Helper for 3D text billboards
+        function makeLabelSprite(text, color) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 360;
+            canvas.height = 70;
+            const ctx = canvas.getContext('2d');
+
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+            if (ctx.roundRect) {
+                ctx.roundRect(8, 8, 344, 54, 10);
+            } else {
+                ctx.rect(8, 8, 344, 54);
+            }
+            ctx.fill();
+
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2.5;
+            ctx.stroke();
+
+            ctx.font = 'bold 18px "Segoe UI", system-ui, sans-serif';
+            ctx.fillStyle = color;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, 180, 35);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            const mat = new THREE.SpriteMaterial({ map: texture, transparent: true });
+            const sprite = new THREE.Sprite(mat);
+            sprite.scale.set(6.8, 1.4, 1);
+            return sprite;
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById('canvas-3d-wrapper');
+            if (!container) return;
+            const w = container.clientWidth;
+            const h = container.clientHeight || 400;
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
+            renderer.setSize(w, h);
+        }
+
+        // Three.js Render Loop
+        function animate() {
+            requestAnimationFrame(animate);
+            TWEEN.update();
+            controls.update();
+
+            // Rotations
+            if (egoWireframe) egoWireframe.rotation.y += 0.007;
+            if (objectRing) objectRing.rotation.z += 0.008;
+
+            if (autoRotate3D) {
+                if (egoMesh) egoMesh.rotation.y += 0.003;
+                if (objectMesh) objectMesh.rotation.y += 0.003;
+            }
+
+            // Animate Libido Particles
+            if (libidoPoints && selectedEventIndex >= 0) {
+                const metrics = schreberEvents[selectedEventIndex].metrics;
+                const pos = libidoPoints.geometry.attributes.position.array;
+                const speeds = libidoPoints.userData.speeds;
+
+                for (let i = 0; i < pos.length; i += 3) {
+                    const idx = i / 3;
+
+                    // Catástrofe: Retiro masivo al Yo (-7.5)
+                    if (metrics.rep >= 70) {
+                        pos[i] += (-7.5 - pos[i]) * 0.04 + (Math.random() - 0.5) * 0.15;
+                        pos[i + 1] += (0 - pos[i + 1]) * 0.04 + (Math.random() - 0.5) * 0.15;
+                        pos[i + 2] += (0 - pos[i + 2]) * 0.04 + (Math.random() - 0.5) * 0.15;
+                    } 
+                    // Restitución: Dispersión cósmica
+                    else if (metrics.rest >= 70) {
+                        pos[i] += (Math.random() - 0.5) * 0.35;
+                        pos[i + 1] += 0.08 + (Math.random() - 0.5) * 0.1;
+                        if (pos[i + 1] > 8) pos[i + 1] = -4;
+                    } 
+                    // Normal hacia el Objeto (+7.5)
+                    else {
+                        pos[i] += speeds[idx].vx;
+                        pos[i + 1] += speeds[idx].vy;
+                        pos[i + 2] += speeds[idx].vz;
+
+                        if (pos[i] > 7.5) {
+                            pos[i] = -7.5;
+                            pos[i + 1] = (Math.random() - 0.5) * 3;
+                            pos[i + 2] = (Math.random() - 0.5) * 3;
+                        }
+                    }
+                }
+                libidoPoints.geometry.attributes.position.needsUpdate = true;
+            }
+
+            // Animate Divine Rays
+            if (divineRaysPoints && divineRaysPoints.material.opacity > 0.05) {
+                const rayPos = divineRaysPoints.geometry.attributes.position.array;
+                for (let i = 1; i < rayPos.length; i += 3) {
+                    rayPos[i] -= 0.16;
+                    if (rayPos[i] < -2) rayPos[i] = 12;
+                }
+                divineRaysPoints.geometry.attributes.position.needsUpdate = true;
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // --- 2. RENDER TIMELINE EVENT CARDS & CONNECTOR STEMS ---
+        function renderTimelineAnchors() {
+            eventsContainer.innerHTML = '';
+            const total = schreberEvents.length;
+
+            schreberEvents.forEach((ev, idx) => {
+                // Calculate percentage position along horizontal rail (0% to 100%)
+                const pct = (idx / (total - 1)) * 100;
+
+                // Alternate short stem heights so cards stay compact and close to rail
+                const stemHeight = (idx % 2 === 0) ? 14 : 26;
+
+                const anchor = document.createElement('div');
+                anchor.className = 'event-anchor dimmed';
+                anchor.id = `event-anchor-${idx}`;
+                anchor.style.left = `${pct}%`;
+                anchor.dataset.index = idx;
+
+                // Card content + connector line + base dot
+                anchor.innerHTML = `
+                    <div class="event-bubble" title="${ev.title}">
+                        <div class="event-bubble-year">${ev.yearLabel}</div>
+                        <div class="event-bubble-title">${ev.cardTitle}</div>
+                        <div class="event-bubble-symptom">⚡ ${ev.symptomChips[0] || 'Síntoma'}</div>
+                    </div>
+                    <div class="event-stem-line" style="height: ${stemHeight}px;"></div>
+                    <div class="event-stem-dot"></div>
+                `;
+
+                // Clicking directly on an anchor animates the slider button there
+                anchor.addEventListener('click', () => {
+                    animateSliderTo(idx);
+                });
+
+                eventsContainer.appendChild(anchor);
+            });
+        }
+
+        // --- 3. DYNAMIC PROXIMITY & SELECTION LOGIC ---
+        // Conforme el botón se acerca a los acontecimientos, se van revelando e iluminando
+        function onSliderMove(val) {
+            currentSliderVal = parseFloat(val);
+            const total = schreberEvents.length;
+            const maxIdx = total - 1;
+
+            // Update Progress bar width & Scrubber tooltip
+            const pct = (currentSliderVal / maxIdx) * 100;
+            railProgress.style.width = `${pct}%`;
+            scrubberBubble.style.left = `${pct}%`;
+
+            // Closest discrete event index
+            const closestIdx = Math.round(currentSliderVal);
+            scrubberBubble.innerText = `${schreberEvents[closestIdx].yearLabel}`;
+
+            // Reveal cards dynamically based on proximity distance to slider button
+            const proximityThreshold = 1.6; // In index distance units
+
+            schreberEvents.forEach((ev, idx) => {
+                const anchor = document.getElementById(`event-anchor-${idx}`);
+                if (!anchor) return;
+
+                const dist = Math.abs(currentSliderVal - idx);
+
+                if (dist < 0.45) {
+                    // ACTIVE EVENT (Directly under the button)
+                    anchor.className = 'event-anchor active';
+                } else if (dist < proximityThreshold) {
+                    // APPROACHING (Within near proximity: reveals and glows)
+                    anchor.className = 'event-anchor approaching';
+                } else {
+                    // DISTANT (Faded out)
+                    anchor.className = 'event-anchor dimmed';
+                }
+            });
+
+            // If the closest event has changed, update detailed UI & 3D Model
+            if (closestIdx !== selectedEventIndex) {
+                applyEventSelection(closestIdx);
+            }
+        }
+
+        function applyEventSelection(idx) {
+            selectedEventIndex = idx;
+            const data = schreberEvents[idx];
+
+            // 1. Stage Pills Active State
+            document.querySelectorAll('.stage-pill').forEach(pill => {
+                const st = parseInt(pill.dataset.stage);
+                if (st === data.stage) pill.classList.add('active');
+                else pill.classList.remove('active');
+            });
+
+            // 2. Barra de Contraste Clínico: Brote vs Restitución
+            const contrastBar = document.getElementById('clinical-contrast-bar');
+            if (contrastBar) {
+                contrastBar.className = '';
+                if (data.clinicalType === 'brote') {
+                    contrastBar.classList.add('contrast-brote');
+                } else if (data.clinicalType === 'restitucion') {
+                    contrastBar.classList.add('contrast-restitucion');
+                } else {
+                    contrastBar.classList.add('contrast-previa');
+                }
+            }
+
+            const badgeEl = document.getElementById('contrast-badge');
+            if (badgeEl) {
+                badgeEl.innerText = data.contrastBadge;
+                if (data.clinicalType === 'brote') {
+                    badgeEl.className = 'text-xs px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/50';
+                } else if (data.clinicalType === 'restitucion') {
+                    badgeEl.className = 'text-xs px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/50';
+                } else {
+                    badgeEl.className = 'text-xs px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider bg-sky-500/20 text-sky-300 border border-sky-500/40';
+                }
+            }
+
+            const titleEl = document.getElementById('contrast-phase-title');
+            if (titleEl) titleEl.innerText = data.contrastHeadline;
+
+            const exampleEl = document.getElementById('contrast-example-text');
+            if (exampleEl) exampleEl.innerText = data.contrastExample;
+
+            // 3. Libro / Texto de Freud (1911): Referencias y Citas
+            const refPageEl = document.getElementById('freud-book-page-ref');
+            if (refPageEl) refPageEl.innerText = data.freudRef.page;
+
+            const sectionEl = document.getElementById('freud-section-label');
+            if (sectionEl) sectionEl.innerText = data.freudRef.section;
+
+            const syncBadgeEl = document.getElementById('freud-event-sync-badge');
+            if (syncBadgeEl) syncBadgeEl.innerText = `Hito: ${data.yearLabel}`;
+
+            const topicEl = document.getElementById('freud-chapter-topic');
+            if (topicEl) topicEl.innerText = data.freudRef.topic;
+
+            // Animación suave de transición para la cita textual
+            const quoteEl = document.getElementById('freud-quote-body');
+            if (quoteEl) {
+                quoteEl.style.opacity = '0';
+                quoteEl.style.transform = 'translateY(4px)';
+                setTimeout(() => {
+                    quoteEl.innerText = `«${data.freudRef.quote}»`;
+                    quoteEl.style.opacity = '1';
+                    quoteEl.style.transform = 'translateY(0)';
+                }, 100);
+            }
+
+            const commentaryEl = document.getElementById('freud-analytic-commentary');
+            if (commentaryEl) commentaryEl.innerText = data.freudRef.commentary;
+
+            // 4. Medidores del Aparato Psíquico integrados
+            const m = data.metrics;
+            document.getElementById('num-narc').innerText = `${m.narc}%`;
+            document.getElementById('bar-narc').style.width = `${m.narc}%`;
+
+            document.getElementById('num-lib').innerText = `${m.lib}%`;
+            document.getElementById('bar-lib').style.width = `${m.lib}%`;
+
+            document.getElementById('num-rep').innerText = `${m.rep}%`;
+            document.getElementById('bar-rep').style.width = `${m.rep}%`;
+
+            document.getElementById('num-rest').innerText = `${m.rest}%`;
+            document.getElementById('bar-rest').style.width = `${m.rest}%`;
+
+            // 5. Transformaciones del Aparato Psíquico 3D
+            updateApparatusTransformations(m);
+        }
+
+        // --- 4. 3D APPARATUS TRANSFORMATIONS WITH TWEEN ---
+        function updateApparatusTransformations(m) {
+            if (!egoMesh || !objectMesh || !repressionBarrier) return;
+
+            // Yo Scale: Grew with Narcissism (0 - 100)
+            const egoScale = 1.0 + (m.narc / 80);
+            new TWEEN.Tween(egoGroup.scale)
+                .to({ x: egoScale, y: egoScale, z: egoScale }, 550)
+                .easing(TWEEN.Easing.Cubic.Out)
+                .start();
+
+            // Objeto Scale: Shrinks down to 20% in World Catastrophe (rep >= 70)
+            const objScale = Math.max(0.2, 1.0 - (m.rep / 120));
+            new TWEEN.Tween(objectGroup.scale)
+                .to({ x: objScale, y: objScale, z: objScale }, 550)
+                .easing(TWEEN.Easing.Cubic.Out)
+                .start();
+
+            // Objeto Opacity: Fades almost out when libido is withdrawn
+            const objOpacity = Math.max(0.18, 1.0 - (m.rep / 130));
+            new TWEEN.Tween(objectMesh.material)
+                .to({ opacity: objOpacity }, 500)
+                .start();
+
+            // Repression Barrier thickness and opacity
+            const barrierOpacity = 0.2 + (m.rep / 130);
+            const barrierThick = 0.4 + (m.rep / 38);
+            new TWEEN.Tween(repressionBarrier.material)
+                .to({ opacity: barrierOpacity }, 500)
+                .start();
+            new TWEEN.Tween(repressionBarrier.scale)
+                .to({ x: barrierThick, y: 1.0, z: 1.0 }, 500)
+                .start();
+
+            // Libido particles color transition
+            let targetColor = 0x10b981; // Green
+            if (m.rep >= 70) targetColor = 0xef4444; // Red (Catastrophe)
+            else if (m.rest >= 70) targetColor = 0xc084fc; // Purple (God's Rays)
+
+            new TWEEN.Tween(libidoPoints.material.color)
+                .to(new THREE.Color(targetColor), 600)
+                .start();
+
+            // Divine Rays particles opacity
+            const raysAlpha = (m.rest >= 60) ? (m.rest / 110) : 0.0;
+            new TWEEN.Tween(divineRaysPoints.material)
+                .to({ opacity: raysAlpha }, 700)
+                .start();
+        }
+
+        // Smoothly animate slider value to target
+        function animateSliderTo(targetIdx) {
+            const startVal = parseFloat(sliderInput.value);
+            const obj = { val: startVal };
+
+            new TWEEN.Tween(obj)
+                .to({ val: targetIdx }, 400)
+                .easing(TWEEN.Easing.Cubic.Out)
+                .onUpdate(() => {
+                    sliderInput.value = obj.val;
+                    onSliderMove(obj.val);
+                })
+                .start();
+        }
+
+        // --- 5. SETUP CONTROLS AND EVENT LISTENERS ---
+        function setupEventListeners() {
+            // Slider Input Event (Mover el botón horizontalmente)
+            sliderInput.addEventListener('input', (e) => {
+                onSliderMove(e.target.value);
+            });
+
+            // Divisiones de etapas (clic para mover el botón al inicio de cada etapa)
+            document.querySelectorAll('.stage-pill').forEach(pill => {
+                pill.addEventListener('click', () => {
+                    const st = parseInt(pill.dataset.stage);
+                    const firstIdx = schreberEvents.findIndex(ev => ev.stage === st);
+                    if (firstIdx !== -1) {
+                        animateSliderTo(firstIdx);
+                    }
+                });
+            });
+
+            // Navegación complementaria con flechas de teclado (desplaza el botón)
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowLeft') {
+                    let prevIdx = Math.max(0, selectedEventIndex - 1);
+                    animateSliderTo(prevIdx);
+                } else if (e.key === 'ArrowRight') {
+                    let nextIdx = Math.min(schreberEvents.length - 1, selectedEventIndex + 1);
+                    animateSliderTo(nextIdx);
+                }
+            });
+
+            // 3D Controls
+            btnResetCam.addEventListener('click', () => {
+                new TWEEN.Tween(camera.position)
+                    .to({ x: 0, y: 3, z: 26 }, 800)
+                    .easing(TWEEN.Easing.Cubic.Out)
+                    .start();
+                new TWEEN.Tween(controls.target)
+                    .to({ x: 0, y: 0, z: 0 }, 800)
+                    .easing(TWEEN.Easing.Cubic.Out)
+                    .start();
+            });
+
+            btnToggleOrbit.addEventListener('click', () => {
+                autoRotate3D = !autoRotate3D;
+                btnToggleOrbit.innerText = autoRotate3D ? "🌐 Rotación: ON" : "🌐 Rotación: OFF";
+                btnToggleOrbit.style.color = autoRotate3D ? "#38bdf8" : "#94a3b8";
+            });
+        }
+
+        // --- APP ENTRY POINT ---
+        window.addEventListener('DOMContentLoaded', () => {
+            renderTimelineAnchors();
+            initThreeJS();
+            setupEventListeners();
+            onSliderMove(0);
+        });
+    </script>
+</body>
+</html>
